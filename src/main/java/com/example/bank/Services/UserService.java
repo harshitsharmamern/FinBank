@@ -1,9 +1,17 @@
 package com.example.bank.Services;
 
 import com.example.bank.Dto.Loginrequestbody;
+import com.example.bank.Dto.TransactionDto;
+import com.example.bank.Entity.Transaction;
 import com.example.bank.Entity.User;
+import com.example.bank.Exception.UserException;
+import com.example.bank.Repository.TransactionRepo;
 import com.example.bank.Repository.UserRepo;
 import com.example.bank.controller.user;
+
+import io.micrometer.core.ipc.http.HttpSender.Response;
+import jakarta.transaction.Transactional;
+
 import org.modelmapper.ModelMapper;
 
 import java.util.ArrayList;
@@ -23,6 +31,8 @@ public class UserService implements UserServiceInterface{
     
     @Autowired
     private UserRepo userRepo;
+        @Autowired
+    TransactionRepo transactionRepo;
 
     UserService(ModelMapper modelMapper) {
         this.modelMapper = modelMapper;
@@ -38,31 +48,32 @@ public class UserService implements UserServiceInterface{
         return createAccounts;
     }
     @Override
-    public String login(Loginrequestbody loginrequestbody) {
-        String aadhar = loginrequestbody.getAccountNumber();
+    public User login(Loginrequestbody loginrequestbody) {
+        String accountnum = loginrequestbody.getAccountNumber();
         String password = loginrequestbody.getPassword();
         try{
 
-            User user = userRepo.findByAccountNumber(aadhar).orElse(null);
+            User user = userRepo.findByAccountNumber(accountnum).orElse(null);
             if(user==null){
-                return "User Not Found";
+                throw new UserException("Account Number does not exist");
             }
             if(user.getPassword().equals(password)){
-                return "Login Successful";
+                return user;
             }
-            return "Invalid Credentials";
+            else{
+                throw new UserException("Incorrect Password");
+            }
         }
         catch(Exception e){
             // System.out.println(e.getMessage());
-            return e.getMessage();
-        }
+            throw new UserException(e.getMessage());      }
     }
 
     @Override
+    @Transactional
     public CreateAccount CreateAccount(CreateAccount createAccount)  {
         User user = new User();
-        try{
-
+     
             //i want to check first is Aadhar phonenumber email pan is already exist or not
             String aadhar = createAccount.getAadharNumber();
             // String email = createAccount.getEmail();
@@ -70,23 +81,24 @@ public class UserService implements UserServiceInterface{
             String phone = createAccount.getPhoneNumber();
             
             if (userRepo.findByAadharNumber(aadhar).isPresent()) {
-                 throw new Exception("Aadhar number already exists");
-                // return null;
+                 throw new UserException("Aadhar number already exists");
+                
+                 // return null;
                 // return "Aadhar number already exists";
         }
         if (userRepo.findByPanNumber(createAccount.getPanNumber()).isPresent()) {
-            throw new Exception("PAN number already exists");
+            throw new UserException("PAN number already exists");
             // return null;
             // return "PAN number already exists";
         }
         if (userRepo.findByPhoneNumber(createAccount.getPhoneNumber()).isPresent()) {
-            throw new Exception("Phone number already exists");
+            throw new UserException("Phone number already exists");
 
             // return null;
             // return "Phone number already exists";
         }
         if (userRepo.findByEmail(createAccount.getEmail()).isPresent()) {
-            throw new Exception("Email already exists");
+            throw new UserException("Email already exists");
             // return null;
             // return "Email already exists";
         }
@@ -109,18 +121,91 @@ public class UserService implements UserServiceInterface{
         user.setPassword(createAccount.getPassword());
         user.setAccountType(createAccount.getAccountType());
         user.setInitialDeposit(createAccount.getInitialDeposit());
+        user.setCurrentballance(createAccount.getInitialDeposit());
+
+        TransactionDto transactions =  new TransactionDto();
+
+        transactions.setFromAccount(user.getAccountNumber());
+
+        transactions.setToAccount(user.getAccountNumber());
+        transactions.setAmount(createAccount.getInitialDeposit());
+        transactions.setTransactionType("Deposit");
+        transactions.setTransactionDate(java.time.LocalDate.now().toString());
         
+        Transaction transactionEntity = modelMapper.map(transactions, Transaction.class);
+        transactionEntity.setUser(user);
+
+        transactionRepo.save(transactionEntity);
+
+        // Transaction transactionEntity = modelMapper.map(transactions, Transaction.class);
+        user.setTransactions(List.of(transactionEntity));
 
         var data = userRepo.save(user);
 
         return modelMapper.map(data, CreateAccount.class);
 
-        // return "User Created Successfully";
     }
-    catch(Exception e){
-        System.out.println(e.getMessage());
-        return null;
-    }
+
+
+    @Transactional
+    public CreateAccount transferMoney(String fromAccount, String toAccount, Double amount) {
+        User user = userRepo.findByAccountNumber(fromAccount).orElse(null);
+
+        User recipient = userRepo.findByAccountNumber(toAccount).orElse(null);
     
+        if(user == null) {
+            throw new UserException("Sender account not found");
+        }else if(recipient==null) {
+            throw new UserException("Recipient account not found");
+        }
+
+        if(user.getCurrentballance() < amount){
+            throw new UserException("Insufficient balance");
+        }
+        try{
+
+            // Deduct amount from sender's account
+            user.setCurrentballance(user.getCurrentballance() - amount);
+            
+            TransactionDto transaction = new TransactionDto();
+            transaction.setFromAccount(user.getAccountNumber());
+            transaction.setToAccount(recipient.getAccountNumber());
+            transaction.setAmount(amount);
+            transaction.setTransactionType("debit");
+            transaction.setTransactionDate(java.time.LocalDate.now().toString());
+
+            // user.getTransactions().add(transaction);
+            Transaction transactionEntity = modelMapper.map(transaction, Transaction.class);
+            transactionEntity.setUser(user);
+            transactionRepo.save(transactionEntity);
+
+            
+            user.getTransactions().add(transactionEntity);
+            userRepo.save(user);
+
+            // // Add amount to recipient's account
+            recipient.setCurrentballance(recipient.getCurrentballance() + amount);
+            
+            // transaction = new TransactionDto();
+            // transaction.setFromAccount(user.getAccountNumber());
+            // transaction.setToAccount(recipient.getAccountNumber());
+            // transaction.setAmount(amount);
+            transaction.setTransactionType("credit");
+            // transaction.setTransactionDate(java.time.LocalDate.now().toString());
+            
+            transactionEntity = modelMapper.map(transaction, Transaction.class);
+            transactionEntity.setUser(recipient);
+            recipient.getTransactions().add(transactionEntity);
+            
+            userRepo.save(recipient);
+
+            return modelMapper.map(user, CreateAccount.class);
+        } catch(Exception e){
+            throw new UserException(e.getMessage());
+        }
+    }
+
+    public void deleteAllAccounts(){
+        userRepo.deleteAll();
     }
 }

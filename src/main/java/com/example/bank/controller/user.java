@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.bank.Dto.CreateAccount;
 import com.example.bank.Dto.Loginrequestbody;
+import com.example.bank.Entity.User;
 import com.example.bank.Services.UserService;
 
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,25 +29,50 @@ public class user {
        return userService.getAllusers();
    }
    @PostMapping("/login")
-   public String LoginMethod(@RequestBody Loginrequestbody loginrequestbody){ 
-       return userService.login(loginrequestbody);
+   public ResponseEntity<?> LoginMethod(@RequestBody Loginrequestbody loginrequestbody){ 
+        User user = userService.login(loginrequestbody);
+        HashMap<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("data", user);
+        return ResponseEntity.ok(response);
    }
 
    @PostMapping("/CreateAccount")
-   public ResponseEntity<HashMap<String, Object>> createAccount(@RequestBody CreateAccount createAccount) {
+   public ResponseEntity<?> createAccount(@RequestBody CreateAccount createAccount) {
     System.out.println(createAccount);
-    HashMap<String, Object> response = new HashMap<>();
-
     CreateAccount user  = userService.CreateAccount(createAccount);
-    if(user!=null){
-        response.put("data", user);
-        response.put("message", "success");
-    }else{
-        response.put("data", null);
-        response.put("message", "failed");
-    }
-        return ResponseEntity.ok(response);
+    HashMap<String, Object> response = new HashMap<>();
+    response.put("status", "success");
+    response.put("data", user);
+    return ResponseEntity.ok(response);
    }
+
+   @PostMapping("/transfer-money")
+   public ResponseEntity<?> transferMoney(@RequestBody HashMap<String, Object> transferRequest) {
+    // Implement money transfer logic here
+    String fromAccount = (String) transferRequest.get("fromAccount");
+    String toAccount = (String) transferRequest.get("toAccount");
+    Double amount = Double.valueOf(transferRequest.get("amount").toString());
+
+    try{
+        CreateAccount user = userService.transferMoney(fromAccount, toAccount, amount);
+    
+        HashMap<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "Money transferred successfully");
+        response.put("data", user);
+        return ResponseEntity.ok(response);
+    }catch(Exception e){
+        throw new RuntimeException(e.getMessage());
+    }
+   }
+
+   @DeleteMapping("/delete-accounts")
+    public String deleteAllAccounts() {
+         userService.deleteAllAccounts();
+         return "All accounts deleted successfully.";
+    }
+    
    
 }
    

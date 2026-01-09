@@ -1,10 +1,19 @@
 package com.example.bank.Entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import com.example.bank.Dto.TransactionDto;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
@@ -31,7 +40,14 @@ public class User {
     private String accountType;
     private Double initialDeposit;
 
-    private String Currentballance;
+    private Double Currentballance;
+
+    @OneToMany(mappedBy = "user",
+        cascade = CascadeType.ALL,
+        fetch = FetchType.LAZY
+    )
+    
+    private List<Transaction> transactions = new ArrayList<>();
 
 
     
@@ -129,11 +145,18 @@ public class User {
         this.initialDeposit = initialDeposit;
     }
 
-    public String getCurrentballance() {
+    public Double getCurrentballance() {
         return Currentballance;
     }
 
-    public void setCurrentballance(String currentballance) {
+    public void setCurrentballance(Double currentballance) {
         Currentballance = currentballance;
+    }
+
+    public List<Transaction> getTransactions() {
+        return transactions;
+    }
+    public void setTransactions(List<Transaction> transactions) {
+        this.transactions = transactions;
     }
 }

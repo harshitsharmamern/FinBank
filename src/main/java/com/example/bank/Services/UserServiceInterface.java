@@ -1,9 +1,11 @@
 package com.example.bank.Services;
 
 import com.example.bank.Dto.Loginrequestbody;
+import com.example.bank.Entity.User;
 import com.example.bank.Dto.CreateAccount;
 
 public interface UserServiceInterface {
-    public String login(Loginrequestbody loginrequestbody);
+    public User login(Loginrequestbody loginrequestbody);
     public CreateAccount CreateAccount(CreateAccount createAccount);
+    public CreateAccount transferMoney(String fromAccount, String toAccount, Double amount);
 }

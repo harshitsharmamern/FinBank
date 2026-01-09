@@ -1,5 +1,9 @@
 package com.example.bank.Dto;
 
+import java.util.List;
+
+import com.example.bank.Entity.Transaction;
+
 public class CreateAccount {
     private String AccountNumber;
     
@@ -15,7 +19,9 @@ public class CreateAccount {
     private String accountType;
     private Double initialDeposit;
 
-    private String Currentballance;
+    private Double Currentballance;
+
+    private List<Transaction> transactions;
 
 
     public String getAccountNumber() {
@@ -106,12 +112,19 @@ public class CreateAccount {
         this.initialDeposit = initialDeposit;
     }
 
-    public String getCurrentballance() {
+    public Double getCurrentballance() {
         return Currentballance;
     }
 
-    public void setCurrentballance(String currentballance) {
+    public void setCurrentballance(Double currentballance) {
         this.Currentballance = currentballance;
+    }
+
+    public List<Transaction> getTransactions() {
+        return transactions;
+    }
+    public void setTransactions(List<Transaction> transactions) {
+        this.transactions = transactions;
     }
 
     @Override
