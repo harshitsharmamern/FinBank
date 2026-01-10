@@ -15,6 +15,7 @@ import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -148,7 +149,7 @@ public class UserService implements UserServiceInterface{
 
 
     @Transactional
-    public CreateAccount transferMoney(String fromAccount, String toAccount, Double amount) {
+    public HashMap<String, Object> transferMoney(String fromAccount, String toAccount, Double amount) {
         User user = userRepo.findByAccountNumber(fromAccount).orElse(null);
 
         User recipient = userRepo.findByAccountNumber(toAccount).orElse(null);
@@ -198,12 +199,64 @@ public class UserService implements UserServiceInterface{
             recipient.getTransactions().add(transactionEntity);
             
             userRepo.save(recipient);
+            HashMap<String, Object> response = new HashMap<>();
+            response.put("transaction_id", transactionEntity.getTransaction_id());
+            response.put("Use", user);
+
+            return response;
+        } catch(Exception e){
+            throw new UserException(e.getMessage());
+        }
+    }
+
+    public Double getBalance(String accountNumber){
+        User user = userRepo.findByAccountNumber(accountNumber).orElse(null);
+        if(user == null){
+            throw new UserException("Account not found");
+        }
+        return user.getCurrentballance();
+    }
+
+    @Transactional
+    public CreateAccount depositMoney(String accountNumber, Double amount){
+        User user = userRepo.findByAccountNumber(accountNumber).orElse(null);
+        if(user == null){
+            throw new UserException("Account not found");
+        }
+        try{
+
+            user.setCurrentballance(user.getCurrentballance() + amount);
+            
+            TransactionDto transaction = new TransactionDto();
+            transaction.setFromAccount(accountNumber);
+            transaction.setToAccount(accountNumber);
+            transaction.setAmount(amount);
+            transaction.setTransactionType("Deposit");
+            transaction.setTransactionDate(java.time.LocalDate.now().toString());
+            
+            Transaction transactionEntity = modelMapper.map(transaction, Transaction.class);
+            transactionEntity.setUser(user);
+            transactionRepo.save(transactionEntity);
+            
+            user.getTransactions().add(transactionEntity);
+            userRepo.save(user);
 
             return modelMapper.map(user, CreateAccount.class);
         } catch(Exception e){
             throw new UserException(e.getMessage());
         }
     }
+
+    public List<Transaction> getTransactions(String accountNumber){
+        User user = userRepo.findByAccountNumber(accountNumber).orElse(null);
+        if(user == null){
+            throw new UserException("Account not found");
+        }
+        List<Transaction> transactions = user.getTransactions();
+        return transactions;
+    }
+
+  
 
     public void deleteAllAccounts(){
         userRepo.deleteAll();
