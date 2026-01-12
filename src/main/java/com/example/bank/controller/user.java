@@ -6,6 +6,8 @@ import com.example.bank.Dto.CreateAccount;
 import com.example.bank.Dto.Loginrequestbody;
 import com.example.bank.Entity.Transaction;
 import com.example.bank.Entity.User;
+import com.example.bank.Repository.UserRepo;
+import com.example.bank.Security.JwtUtils;
 import com.example.bank.Services.UserService;
 
 import java.util.HashMap;
@@ -20,6 +22,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+
+
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -27,27 +36,73 @@ public class user {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private JwtUtils jwtUtils; 
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private UserRepo UserRepo;
+
+
     @GetMapping("/testing")
    public List<CreateAccount> testing(){ 
        return userService.getAllusers();
    }
    @PostMapping("/login")
    public ResponseEntity<?> LoginMethod(@RequestBody Loginrequestbody loginrequestbody){ 
-        User user = userService.login(loginrequestbody);
+    
+    try{
+
+        // User user = userService.login(loginrequestbody);
+        // User user = UserRepo.findByAccountNumber(loginrequestbody.getAccountNumber()).orElse(null);
+        // if(user == null){
+        //     throw new RuntimeException("User not found with account number: " + loginrequestbody.getAccountNumber());
+        // }
+        Authentication authentication = authenticationManager.authenticate(
+        new UsernamePasswordAuthenticationToken(
+            loginrequestbody.getAccountNumber(),  
+            // i have to change cause in custorm userdetail i will use or set username
+            // user.getUsername(),
+            loginrequestbody.getPassword()
+        )
+    );
+    String jwtToken = jwtUtils.generateToken(authentication);
+
+
         HashMap<String, Object> response = new HashMap<>();
+        
         response.put("status", "success");
-        response.put("data", user);
+        response.put("token", jwtToken);
         return ResponseEntity.ok(response);
+    }catch(Exception e){
+        throw new RuntimeException(e.getMessage());
+    }
    }
+
+
 
    @PostMapping("/CreateAccount")
    public ResponseEntity<?> createAccount(@RequestBody CreateAccount createAccount) {
     System.out.println(createAccount);
-    CreateAccount user  = userService.CreateAccount(createAccount);
     HashMap<String, Object> response = new HashMap<>();
-    response.put("status", "success");
-    response.put("data", user);
-    return ResponseEntity.ok(response);
+    try{
+
+        CreateAccount newUser  = userService.CreateAccount(createAccount);
+        
+        String token = jwtUtils.generateTokenForNewUser(newUser.getAccountNumber());
+        
+        response.put("status", "success");
+        response.put("data", newUser);
+        response.put("token", token);
+        return ResponseEntity.ok(response);
+    }catch(Exception e){
+        throw new RuntimeException(e.getMessage());
+        // response.put("message", e.getMessage());
+        // return ResponseEntity.status(500).body(response);
+    }
    }
 
    @PostMapping("/transfer-money")
@@ -72,17 +127,44 @@ public class user {
     }
    }
 
+   @GetMapping("/loggedin_user")
+   public ResponseEntity<?> getLoginUser(@AuthenticationPrincipal UserDetails userDetails){ 
+    // i want full details of loggin user   
+    HashMap<String, Object> response = new HashMap<>();
+    try{
+        User user = UserRepo.findByAccountNumber(userDetails.getUsername()).orElse(null);
+        if(user==null){
+            // response.put('status', 'error');
+            // response.put('message', 'User not found');
+
+            throw new RuntimeException("User not found with account number: " + userDetails.getUsername());
+        }
+        response.put("status", "success");
+        response.put("data", user);
+        return ResponseEntity.ok(response);
+    
+        }catch(Exception e){
+            throw new RuntimeException(e.getMessage());
+        }
+   }
+   
+
    @DeleteMapping("/delete-accounts")
     public String deleteAllAccounts() {
          userService.deleteAllAccounts();
          return "All accounts deleted successfully.";
     }
 
-    @GetMapping("/balance/{accountNumber}")
-    public ResponseEntity<?> getBalance(@PathVariable String accountNumber) {
-       
-        Double balance = userService.getBalance(accountNumber);
+
+    @GetMapping("/balance")
+    public ResponseEntity<?> getBalance(@AuthenticationPrincipal UserDetails userDetails) {
+       // i want to get account number from jwt token
+        // Double balance = userService.getBalance(accountNumber);
         
+        String accountNumber = userDetails.getUsername();
+
+        Double balance = userService.getBalance(accountNumber);
+
         HashMap<String, Object> response = new HashMap<>();
         response.put("status", "success");
         response.put("accountNumber", accountNumber);

@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.example.bank.Dto.CreateAccount;
@@ -70,6 +71,10 @@ public class UserService implements UserServiceInterface{
             throw new UserException(e.getMessage());      }
     }
 
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @Override
     @Transactional
     public CreateAccount CreateAccount(CreateAccount createAccount)  {
@@ -107,8 +112,9 @@ public class UserService implements UserServiceInterface{
         String accountNumber = pan.substring(0, 4) + phone.substring(6,10) + aadhar.substring(0,4);
         
         while(userRepo.findByAccountNumber(accountNumber).isPresent()){
-            int randomNum = (int)(Math.random() * 9000) + 1000; // Generate a random 4-digit number
-            accountNumber = pan.substring(0, 4) + phone.substring(6,10) + String.valueOf(randomNum);
+            int randomNum = (int)(Math.random() * 90000) + 10000; // Generate a random 4-digit number
+            accountNumber = 
+            pan.substring(0, 4) + phone.substring(6,10) + String.valueOf(randomNum);
         }
 
         user.setAccountNumber(accountNumber);
@@ -119,10 +125,14 @@ public class UserService implements UserServiceInterface{
         user.setAddress(createAccount.getAddress());
         user.setAadharNumber(createAccount.getAadharNumber());
         user.setPanNumber(createAccount.getPanNumber());
-        user.setPassword(createAccount.getPassword());
         user.setAccountType(createAccount.getAccountType());
         user.setInitialDeposit(createAccount.getInitialDeposit());
         user.setCurrentballance(createAccount.getInitialDeposit());
+        
+
+        //make it encoded 
+        // user.setPassword(createAccount.getPassword());
+        user.setPassword(passwordEncoder.encode(createAccount.getPassword()));
 
         TransactionDto transactions =  new TransactionDto();
 
